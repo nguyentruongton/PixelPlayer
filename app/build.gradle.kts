@@ -281,7 +281,7 @@ dependencies {
     implementation(libs.androidx.media)
     implementation(libs.androidx.app)
     implementation(libs.androidx.app.projected)
-
+    implementation(libs.tdlib)
 }
 
 

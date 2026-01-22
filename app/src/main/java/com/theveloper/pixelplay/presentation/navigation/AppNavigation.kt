@@ -353,12 +353,25 @@ fun AppNavigation(
                 enterTransition = { enterTransition() },
                 exitTransition = { exitTransition() },
                 popEnterTransition = { popEnterTransition() },
-                popExitTransition = { popExitTransition() },
+                popExitTransition = { popExitTransition() }
             ) {
                 ScreenWrapper(navController = navController) {
                     EqualizerScreen(
                         navController = navController,
                         playerViewModel = playerViewModel
+                    )
+                }
+            }
+            composable(
+                Screen.TelegramLogin.route,
+                enterTransition = { enterTransition() },
+                exitTransition = { exitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() },
+            ) {
+                ScreenWrapper(navController = navController) {
+                    com.theveloper.pixelplay.presentation.screens.settings.TelegramLoginScreen(
+                        onBackPressed = { navController.popBackStack() }
                     )
                 }
             }

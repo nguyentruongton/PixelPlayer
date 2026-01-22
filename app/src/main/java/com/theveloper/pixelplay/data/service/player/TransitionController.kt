@@ -108,7 +108,7 @@ class TransitionController @Inject constructor(
         // Initial setup
         currentObservedPlayer = engine.masterPlayer
         currentObservedPlayer?.addListener(transitionListener!!)
-        engine.addPlayerSwapListener(swapListener)
+        engine.addOnPlayerSwappedListener(swapListener)
     }
 
     private fun scheduleTransitionFor(currentMediaItem: MediaItem) {
@@ -119,7 +119,7 @@ class TransitionController @Inject constructor(
             // WAIT for any active transition to finish.
             // If we proceed immediately, we might call prepareNext() which resets playerB.
             // But during a crossfade, playerB is the "Outgoing Player", so resetting it kills the fade.
-            while (engine.isTransitionRunning()) {
+            while (engine.isTransitionRunning) {
                 Timber.tag("TransitionDebug").d("Waiting for active transition to finish before scheduling next...")
                 delay(500)
             }
@@ -277,7 +277,7 @@ class TransitionController @Inject constructor(
     fun release() {
         Timber.tag("TransitionDebug").d("Releasing controller.")
         transitionSchedulerJob?.cancel()
-        engine.removePlayerSwapListener(swapListener)
+        engine.removeOnPlayerSwappedListener(swapListener)
         transitionListener?.let { currentObservedPlayer?.removeListener(it) }
         transitionListener = null
         currentObservedPlayer = null

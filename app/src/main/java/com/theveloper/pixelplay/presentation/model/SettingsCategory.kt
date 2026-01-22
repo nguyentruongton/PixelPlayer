@@ -61,6 +61,12 @@ enum class SettingsCategory(
         title = "About",
         subtitle = "App info, version, and credits",
         icon = Icons.Rounded.Info
+    ),
+    CLOUD(
+        id = "cloud",
+        title = "Cloud & Streaming",
+        subtitle = "Telegram integration and cloud music",
+        icon = Icons.Rounded.SmartToy // Placeholder or Cloud icon if available
     );
 
     companion object {

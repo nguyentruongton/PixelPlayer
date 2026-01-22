@@ -29,6 +29,8 @@ import com.theveloper.pixelplay.data.repository.MusicRepository
 import com.theveloper.pixelplay.data.repository.MusicRepositoryImpl
 import com.theveloper.pixelplay.data.repository.TransitionRepository
 import com.theveloper.pixelplay.data.repository.TransitionRepositoryImpl
+import com.theveloper.pixelplay.data.repository.TelegramRepository
+import com.theveloper.pixelplay.data.repository.TelegramRepositoryImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -83,10 +85,17 @@ object AppModule {
             PixelPlayDatabase.MIGRATION_6_7,
             PixelPlayDatabase.MIGRATION_9_10,
             PixelPlayDatabase.MIGRATION_10_11,
-            PixelPlayDatabase.MIGRATION_11_12
+            PixelPlayDatabase.MIGRATION_11_12,
+            PixelPlayDatabase.MIGRATION_12_13
         )
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
+    }
+
+    @Singleton
+    @Provides
+    fun provideCloudSongDao(database: PixelPlayDatabase): com.theveloper.pixelplay.data.database.CloudSongDao { // Added CloudSongDao provider
+        return database.cloudSongDao()
     }
 
     @Singleton
@@ -361,5 +370,13 @@ object AppModule {
         musicDao: MusicDao
     ): ArtistImageRepository {
         return ArtistImageRepository(deezerApiService, musicDao)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTelegramRepository(
+        repo: TelegramRepositoryImpl
+    ): TelegramRepository {
+        return repo
     }
 }

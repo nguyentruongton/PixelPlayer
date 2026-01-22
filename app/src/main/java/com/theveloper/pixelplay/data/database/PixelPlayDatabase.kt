@@ -15,17 +15,19 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ArtistEntity::class,
         TransitionRuleEntity::class,
         SongArtistCrossRef::class,
-        SongEngagementEntity::class
+        SongEngagementEntity::class,
+        com.theveloper.pixelplay.data.model.CloudSong::class // Added CloudSong entity
     ],
-    version = 12, // Incremented version for song engagements table
+    version = 13, // Incremented version for cloud_songs table
     exportSchema = false
 )
 abstract class PixelPlayDatabase : RoomDatabase() {
     abstract fun albumArtThemeDao(): AlbumArtThemeDao
     abstract fun searchHistoryDao(): SearchHistoryDao
-    abstract fun musicDao(): MusicDao // Added MusicDao
+    abstract fun musicDao(): MusicDao
     abstract fun transitionDao(): TransitionDao
     abstract fun engagementDao(): EngagementDao
+    abstract fun cloudSongDao(): CloudSongDao // Added CloudSongDao
 
     companion object {
         val MIGRATION_3_4 = object : Migration(3, 4) {
@@ -100,6 +102,23 @@ abstract class PixelPlayDatabase : RoomDatabase() {
                         play_count INTEGER NOT NULL DEFAULT 0,
                         total_play_duration_ms INTEGER NOT NULL DEFAULT 0,
                         last_played_timestamp INTEGER NOT NULL DEFAULT 0
+                    )
+                """.trimIndent())
+            }
+        }
+        
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS cloud_songs (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        fileId INTEGER NOT NULL,
+                        remoteFileId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        artist TEXT NOT NULL,
+                        duration INTEGER NOT NULL,
+                        size INTEGER NOT NULL,
+                        dateAdded INTEGER NOT NULL
                     )
                 """.trimIndent())
             }

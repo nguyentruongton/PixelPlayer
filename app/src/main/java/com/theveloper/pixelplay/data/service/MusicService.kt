@@ -103,7 +103,7 @@ class MusicService : MediaSessionService() {
         engine.masterPlayer.addListener(playerListener)
 
         // Handle player swaps (crossfade) to keep MediaSession in sync
-        engine.addPlayerSwapListener { newPlayer ->
+        engine.addOnPlayerSwappedListener { newPlayer ->
             serviceScope.launch(Dispatchers.Main) {
                 val oldPlayer = mediaSession?.player
                 oldPlayer?.removeListener(playerListener)

@@ -192,6 +192,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 androidx-test-core = { group = "androidx.test", name = "core", version.ref = "androidxTestCore" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "pagingCommon" }
+tdlib = { module = "com.github.tdlibx:td", version = "1.8.56" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -295,6 +295,16 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(24.dp)
                 )
 
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Cloud Category (Standalone)
+                ExpressiveCategoryItem(
+                    category = SettingsCategory.CLOUD,
+                    customColors = getCategoryColors(SettingsCategory.CLOUD, isDark),
+                    onClick = { navController.navigate(Screen.TelegramLogin.route) },
+                    shape = RoundedCornerShape(24.dp)
+                )
+
                 // for player active:
                 Spacer(modifier = Modifier.height(32.dp))
             }
@@ -431,7 +441,8 @@ private fun getCategoryColors(category: SettingsCategory, isDark: Boolean): Pair
             SettingsCategory.AI_INTEGRATION -> Color(0xFF004F58) to Color(0xFF88FAFF) 
             SettingsCategory.DEVELOPER -> Color(0xFF324F34) to Color(0xFFCBEFD0) 
             SettingsCategory.EQUALIZER -> Color(0xFF6E4E13) to Color(0xFFFFDEAC) 
-            SettingsCategory.ABOUT -> Color(0xFF3F474D) to Color(0xFFDEE3EB) 
+            SettingsCategory.ABOUT -> Color(0xFF3F474D) to Color(0xFFDEE3EB)
+            SettingsCategory.CLOUD -> Color(0xFF004B72) to Color(0xFFC3E7FF)
         }
     } else {
         when (category) {
@@ -442,6 +453,7 @@ private fun getCategoryColors(category: SettingsCategory, isDark: Boolean): Pair
             SettingsCategory.DEVELOPER -> Color(0xFFCBEFD0) to Color(0xFF042106)
             SettingsCategory.EQUALIZER -> Color(0xFFFFDEAC) to Color(0xFF281900)
             SettingsCategory.ABOUT -> Color(0xFFEFF1F7) to Color(0xFF44474F)
+             SettingsCategory.CLOUD -> Color(0xFFE1F5FE) to Color(0xFF0277BD) // Cloud Blue
         }
     }
 }

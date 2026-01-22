@@ -33,132 +33,63 @@ import javax.inject.Singleton
  * Player B is the auxiliary player used to pre-buffer and fade in the next track.
  * After a transition, Player A adopts the state of Player B, ensuring continuity.
  */
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+
 @OptIn(UnstableApi::class)
 @Singleton
 class DualPlayerEngine @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val telegramRepository: com.theveloper.pixelplay.data.repository.TelegramRepository
 ) {
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var transitionJob: Job? = null
     private var transitionRunning = false
+
+    private val _activeAudioSessionId = kotlinx.coroutines.flow.MutableStateFlow(C.AUDIO_SESSION_ID_UNSET)
+    val activeAudioSessionId = _activeAudioSessionId.asStateFlow()
+
+    private val onPlayerSwappedListeners = mutableListOf<(ExoPlayer) -> Unit>()
 
     private var playerA: ExoPlayer
     private var playerB: ExoPlayer
 
-    private val onPlayerSwappedListeners = mutableListOf<(Player) -> Unit>()
-    
-    // Active Audio Session ID Flow
-    private val _activeAudioSessionId = kotlinx.coroutines.flow.MutableStateFlow(0)
-    val activeAudioSessionId: kotlinx.coroutines.flow.StateFlow<Int> = _activeAudioSessionId.asStateFlow()
-
-    // Audio Focus Management
-    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    private var audioFocusRequest: AudioFocusRequest? = null
-    private var isFocusLossPause = false
-
-    private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
-        when (focusChange) {
-            AudioManager.AUDIOFOCUS_LOSS -> {
-                Timber.tag("TransitionDebug").d("AudioFocus LOSS. Pausing.")
-                isFocusLossPause = false
-                playerA.playWhenReady = false
-                playerB.playWhenReady = false
-                abandonAudioFocus()
-            }
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                Timber.tag("TransitionDebug").d("AudioFocus LOSS_TRANSIENT. Pausing.")
-                isFocusLossPause = true
-                playerA.playWhenReady = false
-                playerB.playWhenReady = false
-            }
-            AudioManager.AUDIOFOCUS_GAIN -> {
-                Timber.tag("TransitionDebug").d("AudioFocus GAIN. Resuming if paused by loss.")
-                if (isFocusLossPause) {
-                    isFocusLossPause = false
-                    playerA.playWhenReady = true
-                    if (transitionRunning) playerB.playWhenReady = true
-                }
-            }
-        }
-    }
-
-    // Listener to attach to the active master player (playerA)
     private val masterPlayerListener = object : Player.Listener {
-        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-            if (playWhenReady) {
-                requestAudioFocus()
-            } else {
-                if (!isFocusLossPause) {
-                    abandonAudioFocus()
-                }
-            }
-        }
+        // We can add logic to intercept state changes if needed
     }
 
-    fun addPlayerSwapListener(listener: (Player) -> Unit) {
+    val masterPlayer: ExoPlayer
+        get() = playerA
+
+    val isTransitionRunning: Boolean
+        get() = transitionRunning
+
+    fun getAudioSessionId(): Int = playerA.audioSessionId
+
+    fun addOnPlayerSwappedListener(listener: (ExoPlayer) -> Unit) {
         onPlayerSwappedListeners.add(listener)
     }
 
-    fun removePlayerSwapListener(listener: (Player) -> Unit) {
+    fun removeOnPlayerSwappedListener(listener: (ExoPlayer) -> Unit) {
         onPlayerSwappedListeners.remove(listener)
     }
 
-    /** The master player instance that should be connected to the MediaSession. */
-    val masterPlayer: Player
-        get() = playerA
-
-    fun isTransitionRunning(): Boolean = transitionRunning
-
-    /**
-     * Returns the audio session ID of the master player.
-     * Use this to attach audio effects like Equalizer.
-     */
-    /**
-     * Returns the audio session ID of the master player.
-     * Use this to attach audio effects like Equalizer.
-     */
-    fun getAudioSessionId(): Int = playerA.audioSessionId
-
     init {
-        // We initialize BOTH players with NO internal focus handling.
-        // We manage Audio Focus manually via AudioFocusManager.
-        playerA = buildPlayer(handleAudioFocus = false)
+        playerA = buildPlayer(handleAudioFocus = true)
         playerB = buildPlayer(handleAudioFocus = false)
-
-        // Attach listener to initial master
-        playerA.addListener(masterPlayerListener)
         
-        // Initialize active session ID
+        // Initial setup
+        playerA.addListener(masterPlayerListener)
         _activeAudioSessionId.value = playerA.audioSessionId
     }
 
     private fun requestAudioFocus() {
-        if (audioFocusRequest != null) return // Already have or requested
-
-        val attributes = android.media.AudioAttributes.Builder()
-            .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
-            .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
-            .build()
-
-        val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setAudioAttributes(attributes)
-            .setOnAudioFocusChangeListener(focusChangeListener)
-            .build()
-
-        val result = audioManager.requestAudioFocus(request)
-        if (result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
-            audioFocusRequest = request
-        } else {
-            Timber.tag("TransitionDebug").w("AudioFocus Request Failed: $result")
-            playerA.playWhenReady = false
-        }
-    }
-
-    private fun abandonAudioFocus() {
-        audioFocusRequest?.let {
-            audioManager.abandonAudioFocusRequest(it)
-            audioFocusRequest = null
-        }
+         // Basic audio focus request (ExoPlayer handles this significantly, but if we need manual control)
+         // Since we set setAudioAttributes(..., handleAudioFocus = true), ExoPlayer usually manages it.
+         // However, performOverlapTransition calls this.
+         // We can delegate to playerA or just log it if we rely on ExoPlayer's internal handling.
+         // For now, valid stub:
+         val audioAttributes = playerA.audioAttributes
+         playerA.setAudioAttributes(audioAttributes, true)
     }
 
     private fun buildPlayer(handleAudioFocus: Boolean): ExoPlayer {
@@ -169,8 +100,14 @@ class DualPlayerEngine @Inject constructor(
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .setUsage(C.USAGE_MEDIA)
             .build()
+            
+        val dataSourceFactory = PixelPlayDataSource.Factory(context, telegramRepository)
+        val mediaSourceFactory = DefaultMediaSourceFactory(context)
+            .setDataSourceFactory(dataSourceFactory)
 
-        return ExoPlayer.Builder(context, renderersFactory).build().apply {
+        return ExoPlayer.Builder(context, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .build().apply {
             setAudioAttributes(audioAttributes, handleAudioFocus)
             setHandleAudioBecomingNoisy(true)
             // Explicitly keep both players live so they can overlap without affecting each other

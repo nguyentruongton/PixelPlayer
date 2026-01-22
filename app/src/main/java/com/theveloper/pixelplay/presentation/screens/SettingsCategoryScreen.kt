@@ -595,6 +595,15 @@ fun SettingsCategoryScreen(
                                 onClick = { settingsViewModel.triggerTestCrash() }
                             )
                         }
+                        SettingsCategory.CLOUD -> {
+                             SettingsItem(
+                                title = "Telegram",
+                                subtitle = "Manage your connected Telegram account.",
+                                leadingIcon = { Icon(Icons.Outlined.Info, null, tint = MaterialTheme.colorScheme.secondary) },
+                                trailingIcon = { Icon(Icons.Rounded.ChevronRight, "Open", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = { navController.navigate(Screen.TelegramLogin.route) }
+                            )
+                        }
                         SettingsCategory.ABOUT -> {
                              SettingsItem(
                                 title = "About PixelPlayer",
