@@ -3072,6 +3072,31 @@ class PlayerViewModel @Inject constructor(
             // This ensures playback continues seamlessly.
         }
     }
+    fun playCloudSong(cloudSong: com.theveloper.pixelplay.data.model.CloudSong) {
+        val song = Song(
+            id = cloudSong.id.toString(),
+            title = cloudSong.title,
+            artist = cloudSong.artist,
+            artistId = 0L,
+            album = "PixelPlay Cloud",
+            albumId = 0L,
+            path = "tdlib://${cloudSong.fileId}",
+            contentUriString = "tdlib://${cloudSong.fileId}",
+            albumArtUriString = null,
+            duration = cloudSong.duration * 1000L,
+            genre = "Cloud",
+            lyrics = null,
+            isFavorite = false,
+            trackNumber = 0,
+            year = 0,
+            dateAdded = cloudSong.dateAdded * 1000L,
+            mimeType = "audio/mpeg",
+            bitrate = 0,
+            sampleRate = 0
+        )
+        playSongs(listOf(song), song, "Cloud Music")
+    }
+
     fun playSongs(songsToPlay: List<Song>, startSong: Song, queueName: String = "None", playlistId: String? = null) {
         viewModelScope.launch {
             transitionSchedulerJob?.cancel()

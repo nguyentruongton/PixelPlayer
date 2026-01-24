@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.media3.common.C
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSpec
-import androidx.media3.datasource.TransferListener
 import com.theveloper.pixelplay.data.repository.TelegramRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -27,7 +26,6 @@ class TdLibDataSource(
         this.uri = dataSpec.uri
         
         // Expected URI format: tdlib://{fileId}
-        // Assuming fileId is passed as authority or path
         try {
             val fileIdStr = dataSpec.uri.host ?: dataSpec.uri.path?.removePrefix("/")
             fileId = fileIdStr!!.toInt()
@@ -35,8 +33,7 @@ class TdLibDataSource(
             throw java.io.IOException("Invalid TDLib URI: ${dataSpec.uri}")
         }
 
-        // Trigger download and get path (blocking for simplicity in this context, 
-        // though DataSource.open() is called on background thread usually)
+        // Trigger download and get path (waits for path to be assigned by TDLib)
         val path = runBlocking {
             telegramRepository.downloadFile(fileId).first()
         }
@@ -46,14 +43,25 @@ class TdLibDataSource(
         }
 
         val file = File(path)
+        
+        // Wait for file to actually exist on disk (download might be initializing)
+        var existenceChecks = 0
+        while (!file.exists() && existenceChecks < 20) { // Wait up to 2 seconds
+            try { Thread.sleep(100) } catch (e: InterruptedException) { }
+            existenceChecks++
+        }
+
+        if (!file.exists()) {
+            throw java.io.IOException("File not found at path: $path")
+        }
+
         randomAccessFile = RandomAccessFile(file, "r")
         randomAccessFile?.seek(dataSpec.position)
         currentPosition = dataSpec.position
         isOpen = true
 
-        // We assume unknown length for streaming if not provided, 
-        // or we could query CloudSong from DB to get expected size.
-        // For now returning C.LENGTH_UNSET as we are "streaming".
+        // For streaming, if length is unset, we return unset.
+        // If we knew the total size from DB, we could return it, but Unset is safer for varying streams.
         val length = if (dataSpec.length == C.LENGTH_UNSET.toLong()) {
              C.LENGTH_UNSET.toLong()
         } else {
@@ -77,27 +85,24 @@ class TdLibDataSource(
 
         if (bytesToRead == 0) return 0
 
-        // Streaming Loop
-        // Try to read from file. If EOF but expecting more (streaming), wait.
         var bytesRead = 0
         var retries = 0
-        val MAX_RETRIES = 50 // 5 seconds wait max per chunk request?
+        // Wait longer for streaming data (up to 30 seconds total if stalled)
+        // 300 * 100ms = 30000ms = 30s
+        val MAX_RETRIES = 300 
         
         while (bytesRead <= 0 && retries < MAX_RETRIES) {
              bytesRead = randomAccessFile?.read(buffer, offset, bytesToRead) ?: -1
              if (bytesRead < 0) {
-                 // EOF reached. Check if we should wait.
-                 // Ideally we check if "download complete". 
-                 // For MVP, we sleep briefly hoping for more data.
-                 // WARNING: blocking here.
-                 Thread.sleep(100)
+                 // EOF reached. Wait for more data to be downloaded.
+                 try { Thread.sleep(100) } catch (e: InterruptedException) { }
                  retries++
-                 // If file grew, seek will work? RAF.read updates pointer automatically.
-                 // We don't strictly know if download is finished here without extra state.
-                 // Assume if after 5 seconds no data, it's done or stalled.
+                 
+                 // Reset bytesRead to 0 to loop again unless we really timed out
                  if (retries >= MAX_RETRIES) {
-                     return -1 // Give up
+                     return -1 
                  }
+                 bytesRead = 0 // Continue loop
              } else {
                  break // Got data
              }

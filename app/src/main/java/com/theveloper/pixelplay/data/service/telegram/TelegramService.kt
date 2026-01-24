@@ -1,6 +1,7 @@
 package com.theveloper.pixelplay.data.service.telegram
 
 import android.content.Context
+import com.theveloper.pixelplay.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -54,8 +55,8 @@ class TelegramService @Inject constructor(
             useChatInfoDatabase = true
             useMessageDatabase = true
             useSecretChats = false
-            apiId = 13349681
-            apiHash = "c0f7af77d301787239063a92d0429e3d"
+            apiId = BuildConfig.TELEGRAM_API_ID
+            apiHash = BuildConfig.TELEGRAM_API_HASH
             systemLanguageCode = "en"
             deviceModel = android.os.Build.MODEL
             systemVersion = android.os.Build.VERSION.RELEASE

@@ -1,0 +1,5 @@
+sdk.dir=/path/to/your/android/sdk
+
+# https://my.telegram.org/apps
+telegram.api.id=YOUR_API_ID_HERE
+telegram.api.hash=YOUR_API_HASH_HERE

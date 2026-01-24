@@ -29,6 +29,10 @@ junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 kotlinx-coroutines = "1.8.0"
+mockk = "1.13.12"
+truth = "1.4.2"
+turbine = "1.1.0"
+junit5 = "5.10.2"
 kotlinxCollectionsImmutable = "0.3.7"
 kotlinxSerializationJson = "1.8.0"
 lifecycleRuntimeKtx = "2.9.0"
@@ -193,6 +197,14 @@ androidx-test-core = { group = "androidx.test", name = "core", version.ref = "an
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 androidx-paging-common = { group = "androidx.paging", name = "paging-common", version.ref = "pagingCommon" }
 tdlib = { module = "com.github.tdlibx:td", version = "1.8.56" }
+
+# Test dependencies
+mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
+truth = { group = "com.google.truth", name = "truth", version.ref = "truth" }
+turbine = { group = "app.cash.turbine", name = "turbine", version.ref = "turbine" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
+junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit5" }
+junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit5" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

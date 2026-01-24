@@ -371,7 +371,22 @@ fun AppNavigation(
             ) {
                 ScreenWrapper(navController = navController) {
                     com.theveloper.pixelplay.presentation.screens.settings.TelegramLoginScreen(
-                        onBackPressed = { navController.popBackStack() }
+                        onBackPressed = { navController.popBackStack() },
+                        onNavigateToCloud = { navController.navigate(Screen.CloudMusic.route) }
+                    )
+                }
+            }
+            composable(
+                Screen.CloudMusic.route,
+                enterTransition = { enterTransition() },
+                exitTransition = { exitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() },
+            ) {
+                ScreenWrapper(navController = navController) {
+                    com.theveloper.pixelplay.presentation.screens.cloud.CloudMusicScreen(
+                        navController = navController,
+                        playerViewModel = playerViewModel
                     )
                 }
             }

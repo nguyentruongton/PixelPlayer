@@ -45,5 +45,6 @@ sealed class Screen(val route: String) {
     object DelimiterConfig : Screen("delimiter_config")
     object Equalizer : Screen("equalizer")
     object TelegramLogin : Screen("telegram_login")
+    object CloudMusic : Screen("cloud_music")
 
 }

@@ -18,6 +18,7 @@ import com.theveloper.pixelplay.presentation.viewmodel.TelegramLoginViewModel
 @Composable
 fun TelegramLoginScreen(
     onBackPressed: () -> Unit,
+    onNavigateToCloud: () -> Unit,
     viewModel: TelegramLoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -55,6 +56,7 @@ fun TelegramLoginScreen(
                                 value = uiState.phoneNumber,
                                 onValueChange = viewModel::onPhoneNumberChanged,
                                 label = { Text("Phone Number (with country code)") },
+                                placeholder = { Text("+84") },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -103,6 +105,12 @@ fun TelegramLoginScreen(
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Logout")
+                            }
+                            Button(
+                                onClick = onNavigateToCloud,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Open Cloud Music")
                             }
                         }
                     }
