@@ -12,6 +12,7 @@ interface TelegramRepository {
     fun getAuthorizationState(): StateFlow<TdApi.AuthorizationState?>
     fun logout(): Flow<Result<Unit>>
     fun downloadFile(fileId: Int): Flow<String>
+    fun downloadFileByRemoteId(remoteFileId: String, fileType: TdApi.FileType? = null): Flow<String>
     fun getPixelPlayCloudChat(): Flow<Long?>
     fun getAudioMessages(chatId: Long): Flow<List<TdApi.Message>>
 }

@@ -3073,6 +3073,7 @@ class PlayerViewModel @Inject constructor(
         }
     }
     fun playCloudSong(cloudSong: com.theveloper.pixelplay.data.model.CloudSong) {
+        Timber.d("playCloudSong: id=${cloudSong.id}, title=${cloudSong.title}, remoteFileId='${cloudSong.remoteFileId}'")
         val song = Song(
             id = cloudSong.id.toString(),
             title = cloudSong.title,
@@ -3080,8 +3081,8 @@ class PlayerViewModel @Inject constructor(
             artistId = 0L,
             album = "PixelPlay Cloud",
             albumId = 0L,
-            path = "tdlib://${cloudSong.fileId}",
-            contentUriString = "tdlib://${cloudSong.fileId}",
+            path = "tdlib://${cloudSong.remoteFileId}",
+            contentUriString = "tdlib://${cloudSong.remoteFileId}",
             albumArtUriString = null,
             duration = cloudSong.duration * 1000L,
             genre = "Cloud",
@@ -3094,6 +3095,7 @@ class PlayerViewModel @Inject constructor(
             bitrate = 0,
             sampleRate = 0
         )
+        Timber.d("playCloudSong: Created song with path='${song.path}'")
         playSongs(listOf(song), song, "Cloud Music")
     }
 

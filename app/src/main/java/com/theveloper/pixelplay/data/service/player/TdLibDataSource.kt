@@ -7,6 +7,8 @@ import androidx.media3.datasource.DataSpec
 import com.theveloper.pixelplay.data.repository.TelegramRepository
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import org.drinkless.tdlib.TdApi
+import timber.log.Timber
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -14,7 +16,7 @@ class TdLibDataSource(
     private val telegramRepository: TelegramRepository
 ) : BaseDataSource(/* isNetwork = */ true) {
 
-    private var fileId: Int = 0
+    private var remoteFileId: String = ""
     private var randomAccessFile: RandomAccessFile? = null
     private var uri: Uri? = null
     private var bytesRemaining: Long = 0
@@ -25,21 +27,21 @@ class TdLibDataSource(
         transferInitializing(dataSpec)
         this.uri = dataSpec.uri
         
-        // Expected URI format: tdlib://{fileId}
-        try {
-            val fileIdStr = dataSpec.uri.host ?: dataSpec.uri.path?.removePrefix("/")
-            fileId = fileIdStr!!.toInt()
-        } catch (e: Exception) {
-            throw java.io.IOException("Invalid TDLib URI: ${dataSpec.uri}")
+        // Expected URI format: tdlib://{remoteFileId}
+        remoteFileId = dataSpec.uri.host ?: dataSpec.uri.path?.removePrefix("/")
+            ?: throw java.io.IOException("Missing remote file ID in URI: ${dataSpec.uri}")
+
+        Timber.d("TdLibDataSource: Opening URI=${dataSpec.uri}, remoteFileId=$remoteFileId")
+
+        // Download using remote file ID (persistent across app restarts)
+        val path = runBlocking {
+            telegramRepository.downloadFileByRemoteId(remoteFileId, TdApi.FileTypeAudio()).first()
         }
 
-        // Trigger download and get path (waits for path to be assigned by TDLib)
-        val path = runBlocking {
-            telegramRepository.downloadFile(fileId).first()
-        }
+        Timber.d("TdLibDataSource: downloadFileByRemoteId returned path='$path'")
 
         if (path.isEmpty()) {
-             throw java.io.IOException("Could not get file path for ID $fileId")
+             throw java.io.IOException("Could not get file path for remote ID $remoteFileId")
         }
 
         val file = File(path)

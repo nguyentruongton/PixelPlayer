@@ -4,9 +4,11 @@ import com.theveloper.pixelplay.data.service.telegram.TelegramService
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import org.drinkless.tdlib.TdApi
+import timber.log.Timber
 import javax.inject.Inject
 
 class TelegramRepositoryImpl @Inject constructor(
@@ -70,6 +72,42 @@ class TelegramRepositoryImpl @Inject constructor(
         }
         
         emit(path)
+    }
+
+    override fun downloadFileByRemoteId(
+        remoteFileId: String,
+        fileType: TdApi.FileType?
+    ): Flow<String> = flow {
+        Timber.d("downloadFileByRemoteId: Starting with remoteFileId='$remoteFileId'")
+        
+        // 1. Get local File object from remote ID using GetRemoteFile
+        val getRemoteFileRequest = TdApi.GetRemoteFile(remoteFileId, fileType)
+        val fileResult = telegramService.sendSuspend(getRemoteFileRequest)
+        
+        Timber.d("downloadFileByRemoteId: GetRemoteFile result isSuccess=${fileResult.isSuccess}, error=${fileResult.exceptionOrNull()?.message}")
+        
+        val file = fileResult.getOrNull() as? TdApi.File
+        
+        if (file == null) {
+            Timber.e("downloadFileByRemoteId: GetRemoteFile returned null for remoteFileId='$remoteFileId'")
+            emit("")
+            return@flow
+        }
+        
+        Timber.d("downloadFileByRemoteId: Got file localId=${file.id}, localPath='${file.local.path}', isDownloadingCompleted=${file.local.isDownloadingCompleted}")
+        
+        // 2. If file already downloaded locally, return path immediately
+        if (file.local.isDownloadingCompleted && file.local.path.isNotEmpty()) {
+            Timber.d("downloadFileByRemoteId: File already downloaded, returning path='${file.local.path}'")
+            emit(file.local.path)
+            return@flow
+        }
+        
+        // 3. Download using local file ID obtained from GetRemoteFile
+        Timber.d("downloadFileByRemoteId: Starting download for localId=${file.id}")
+        val downloadPath = downloadFile(file.id).first()
+        Timber.d("downloadFileByRemoteId: Download completed, path='$downloadPath'")
+        emit(downloadPath)
     }
 
     override fun getPixelPlayCloudChat(): Flow<Long?> = flow {
