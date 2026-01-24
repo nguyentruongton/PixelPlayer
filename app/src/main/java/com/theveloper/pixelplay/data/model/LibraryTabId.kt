@@ -13,7 +13,8 @@ enum class LibraryTabId(
     ARTISTS("ARTIST", "ARTIST", SortOption.ArtistNameAZ),
     PLAYLISTS("PLAYLISTS", "PLAYLISTS", SortOption.PlaylistNameAZ),
     FOLDERS("FOLDERS", "FOLDERS", SortOption.FolderNameAZ),
-    LIKED("LIKED", "LIKED", SortOption.LikedSongDateLiked);
+    LIKED("LIKED", "LIKED", SortOption.LikedSongDateLiked),
+    CLOUD("CLOUD", "CLOUD", SortOption.SongDateAdded);
 
     companion object {
         fun fromStorageKey(key: String): LibraryTabId =

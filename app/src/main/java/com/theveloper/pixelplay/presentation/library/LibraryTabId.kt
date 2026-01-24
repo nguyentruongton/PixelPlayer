@@ -70,6 +70,15 @@ enum class LibraryTabId(
             SortOption.LikedSongAlbum,
             SortOption.LikedSongDateLiked
         )
+    ),
+    Cloud(
+        stableKey = "CLOUD",
+        label = "CLOUD",
+        sortOptions = listOf(
+            SortOption.SongTitleAZ,
+            SortOption.SongTitleZA,
+            SortOption.SongDateAdded
+        )
     );
 
     companion object {

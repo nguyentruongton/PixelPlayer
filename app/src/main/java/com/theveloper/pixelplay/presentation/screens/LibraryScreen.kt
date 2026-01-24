@@ -119,7 +119,9 @@ import com.theveloper.pixelplay.presentation.viewmodel.PlayerViewModel
 import com.theveloper.pixelplay.presentation.viewmodel.StablePlayerState
 import com.theveloper.pixelplay.presentation.viewmodel.PlaylistUiState
 import com.theveloper.pixelplay.presentation.viewmodel.PlaylistViewModel
+import com.theveloper.pixelplay.presentation.viewmodel.CloudMusicViewModel
 import com.theveloper.pixelplay.data.model.LibraryTabId
+import com.theveloper.pixelplay.data.model.CloudSong
 import com.theveloper.pixelplay.data.model.toLibraryTabIdOrNull
 import com.theveloper.pixelplay.data.preferences.LibraryNavigationMode
 import com.theveloper.pixelplay.data.worker.SyncProgress
@@ -507,6 +509,7 @@ fun LibraryScreen(
                             LibraryTabId.PLAYLISTS -> playlistUiState.currentPlaylistSortOption
                             LibraryTabId.LIKED -> playerUiState.currentFavoriteSortOption
                             LibraryTabId.FOLDERS -> playerUiState.currentFolderSortOption
+                            LibraryTabId.CLOUD -> SortOption.SongDateAdded
                         }
 
                         val onSortOptionChanged: (SortOption) -> Unit = remember(playerViewModel, playlistViewModel, currentTabId) {
@@ -518,6 +521,7 @@ fun LibraryScreen(
                                     LibraryTabId.PLAYLISTS -> playlistViewModel.sortPlaylists(option)
                                     LibraryTabId.LIKED -> playerViewModel.sortFavoriteSongs(option)
                                     LibraryTabId.FOLDERS -> playerViewModel.sortFolders(option)
+                                    LibraryTabId.CLOUD -> { /* Cloud songs don't support sorting yet */ }
                                 }
                             }
                         }
@@ -752,6 +756,17 @@ fun LibraryScreen(
                                             }
                                         }
                                     }
+                                }
+
+                                LibraryTabId.CLOUD -> {
+                                    val cloudViewModel: CloudMusicViewModel = hiltViewModel()
+                                    LibraryCloudTab(
+                                        cloudViewModel = cloudViewModel,
+                                        playerViewModel = playerViewModel,
+                                        bottomBarHeight = bottomBarHeightDp,
+                                        isRefreshing = isRefreshing,
+                                        onRefresh = onRefresh
+                                    )
                                 }
 
                                 null -> Unit
@@ -1314,6 +1329,7 @@ private fun LibraryTabId.iconRes(): Int = when (this) {
     LibraryTabId.PLAYLISTS -> R.drawable.rounded_playlist_play_24
     LibraryTabId.FOLDERS -> R.drawable.rounded_folder_24
     LibraryTabId.LIKED -> R.drawable.rounded_favorite_24
+    LibraryTabId.CLOUD -> R.drawable.telegram
 }
 
 private fun LibraryTabId.displayTitle(): String =
@@ -2795,4 +2811,142 @@ fun LibraryPlaylistsTab(
         navController = navController,
         playerViewModel = playerViewModel,
     )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LibraryCloudTab(
+    cloudViewModel: CloudMusicViewModel,
+    playerViewModel: PlayerViewModel,
+    bottomBarHeight: Dp,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit
+) {
+    val cloudSongs by cloudViewModel.savedSongs.collectAsState()
+    val stablePlayerState by playerViewModel.stablePlayerState.collectAsState()
+    
+    val pullToRefreshState = rememberPullToRefreshState()
+    
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = {
+            onRefresh()
+            cloudViewModel.refresh()
+        },
+        state = pullToRefreshState,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        if (cloudSongs.isEmpty()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.telegram),
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No songs found in your library.",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Try rescanning your library in settings if you have music on your device.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(
+                    top = 8.dp,
+                    bottom = bottomBarHeight + MiniPlayerHeight + ListExtraBottomGap
+                ),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(
+                    items = cloudSongs,
+                    key = { it.id }
+                ) { cloudSong ->
+                    CloudSongListItem(
+                        cloudSong = cloudSong,
+                        isPlaying = stablePlayerState.currentSong?.id == cloudSong.id.toString(),
+                        onClick = { playerViewModel.playCloudSong(cloudSong) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CloudSongListItem(
+    cloudSong: CloudSong,
+    isPlaying: Boolean,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+        color = if (isPlaying) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f) 
+                else Color.Transparent,
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Cloud icon placeholder for album art
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(R.drawable.telegram),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.width(12.dp))
+            
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = cloudSong.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal,
+                    color = if (isPlaying) MaterialTheme.colorScheme.primary 
+                            else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${cloudSong.artist} • ${cloudSong.size / 1024 / 1024} MB",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            
+            if (isPlaying) {
+                PlayingEqIcon(color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
 }

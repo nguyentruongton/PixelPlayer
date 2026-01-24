@@ -644,17 +644,21 @@ class PlayerViewModel @Inject constructor(
 
     val libraryTabsFlow: StateFlow<List<String>> = userPreferencesRepository.libraryTabsOrderFlow
         .map { orderJson ->
+            val defaultTabs = listOf("SONGS", "ALBUMS", "ARTIST", "PLAYLISTS", "FOLDERS", "LIKED", "CLOUD")
             if (orderJson != null) {
                 try {
-                    Json.decodeFromString<List<String>>(orderJson)
+                    val savedTabs = Json.decodeFromString<List<String>>(orderJson)
+                    // Merge: keep saved order + append any new tabs not in saved list
+                    val newTabs = defaultTabs.filter { it !in savedTabs }
+                    savedTabs + newTabs
                 } catch (e: Exception) {
-                    listOf("SONGS", "ALBUMS", "ARTIST", "PLAYLISTS", "FOLDERS", "LIKED")
+                    defaultTabs
                 }
             } else {
-                listOf("SONGS", "ALBUMS", "ARTIST", "PLAYLISTS", "FOLDERS", "LIKED")
+                defaultTabs
             }
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("SONGS", "ALBUMS", "ARTIST", "PLAYLISTS", "FOLDERS", "LIKED"))
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), listOf("SONGS", "ALBUMS", "ARTIST", "PLAYLISTS", "FOLDERS", "LIKED", "CLOUD"))
 
     private val _loadedTabs = MutableStateFlow(emptySet<String>())
     private var lastBlockedDirectories: Set<String>? = null
@@ -675,6 +679,7 @@ class PlayerViewModel @Inject constructor(
                 LibraryTabId.PLAYLISTS -> SortOption.PLAYLISTS
                 LibraryTabId.FOLDERS -> SortOption.FOLDERS
                 LibraryTabId.LIKED -> SortOption.LIKED
+                LibraryTabId.CLOUD -> listOf(SortOption.SongTitleAZ, SortOption.SongTitleZA, SortOption.SongDateAdded)
             }
             Trace.endSection()
             options
@@ -3062,7 +3067,7 @@ class PlayerViewModel @Inject constructor(
 
             // Replace items BEFORE current index (indices < currentIndex)
             if (currentIndex > 0) {
-                 enginePlayer.removeMediaItems(0, currentIndex)
+                enginePlayer.removeMediaItems(0, currentIndex)
             }
             if (itemsBefore.isNotEmpty()) {
                 enginePlayer.addMediaItems(0, itemsBefore)
