@@ -62,7 +62,7 @@ fun CloudMusicScreen(
             ) {
                 items(songs) { song ->
                     CloudSongItem(song = song) {
-                        playerViewModel.playCloudSong(song)
+                        playerViewModel.playCloudSongs(songs, song)
                     }
                 }
             }

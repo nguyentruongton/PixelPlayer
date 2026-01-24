@@ -3077,9 +3077,13 @@ class PlayerViewModel @Inject constructor(
             // This ensures playback continues seamlessly.
         }
     }
-    fun playCloudSong(cloudSong: com.theveloper.pixelplay.data.model.CloudSong) {
-        Timber.d("playCloudSong: id=${cloudSong.id}, title=${cloudSong.title}, remoteFileId='${cloudSong.remoteFileId}'")
-        val song = Song(
+
+    /**
+     * Converts a CloudSong (from Telegram) to a Song object for playback.
+     * Uses tdlib:// scheme for the content URI which is resolved by TelegramDataSource.
+     */
+    private fun cloudSongToSong(cloudSong: com.theveloper.pixelplay.data.model.CloudSong): Song {
+        return Song(
             id = cloudSong.id.toString(),
             title = cloudSong.title,
             artist = cloudSong.artist,
@@ -3100,8 +3104,42 @@ class PlayerViewModel @Inject constructor(
             bitrate = 0,
             sampleRate = 0
         )
+    }
+
+    fun playCloudSong(cloudSong: com.theveloper.pixelplay.data.model.CloudSong) {
+        Timber.d("playCloudSong: id=${cloudSong.id}, title=${cloudSong.title}, remoteFileId='${cloudSong.remoteFileId}'")
+        val song = cloudSongToSong(cloudSong)
         Timber.d("playCloudSong: Created song with path='${song.path}'")
         playSongs(listOf(song), song, "Cloud Music")
+    }
+
+    /**
+     * Plays a cloud song and adds all other songs in the list to the queue.
+     * Similar to how local music handles queue.
+     */
+    fun playCloudSongs(
+        cloudSongs: List<com.theveloper.pixelplay.data.model.CloudSong>,
+        startCloudSong: com.theveloper.pixelplay.data.model.CloudSong
+    ) {
+        val songs = cloudSongs.map { cloudSongToSong(it) }
+        val startSong = cloudSongToSong(startCloudSong)
+        playSongs(songs, startSong, "PixelPlay Cloud")
+    }
+
+    /**
+     * Adds a cloud song to the end of the current playback queue.
+     */
+    fun addCloudSongToQueue(cloudSong: com.theveloper.pixelplay.data.model.CloudSong) {
+        val song = cloudSongToSong(cloudSong)
+        addSongToQueue(song)
+    }
+
+    /**
+     * Adds a cloud song to play next (after the currently playing song).
+     */
+    fun addCloudSongNextToQueue(cloudSong: com.theveloper.pixelplay.data.model.CloudSong) {
+        val song = cloudSongToSong(cloudSong)
+        addSongNextToQueue(song)
     }
 
     fun playSongs(songsToPlay: List<Song>, startSong: Song, queueName: String = "None", playlistId: String? = null) {

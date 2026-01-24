@@ -41,9 +41,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Album
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Button
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -2827,6 +2832,10 @@ fun LibraryCloudTab(
     
     val pullToRefreshState = rememberPullToRefreshState()
     
+    // State for bottom sheet
+    var selectedCloudSong by remember { mutableStateOf<CloudSong?>(null) }
+    var showCloudSongSheet by remember { mutableStateOf(false) }
+    
     PullToRefreshBox(
         isRefreshing = isRefreshing,
         onRefresh = {
@@ -2882,11 +2891,43 @@ fun LibraryCloudTab(
                     CloudSongListItem(
                         cloudSong = cloudSong,
                         isPlaying = stablePlayerState.currentSong?.id == cloudSong.id.toString(),
-                        onClick = { playerViewModel.playCloudSong(cloudSong) }
+                        onClick = { playerViewModel.playCloudSongs(cloudSongs, cloudSong) },
+                        onMoreOptionsClick = {
+                            selectedCloudSong = cloudSong
+                            showCloudSongSheet = true
+                        }
                     )
                 }
             }
         }
+    }
+    
+    // Cloud Song Info Bottom Sheet
+    if (showCloudSongSheet && selectedCloudSong != null) {
+        CloudSongInfoBottomSheet(
+            cloudSong = selectedCloudSong!!,
+            onDismiss = { 
+                showCloudSongSheet = false
+                selectedCloudSong = null
+            },
+            onPlaySong = {
+                playerViewModel.playCloudSongs(cloudSongs, selectedCloudSong!!)
+                showCloudSongSheet = false
+                selectedCloudSong = null
+            },
+            onAddToQueue = {
+                playerViewModel.addCloudSongToQueue(selectedCloudSong!!)
+                playerViewModel.sendToast("Added to the queue")
+                showCloudSongSheet = false
+                selectedCloudSong = null
+            },
+            onAddNextToQueue = {
+                playerViewModel.addCloudSongNextToQueue(selectedCloudSong!!)
+                playerViewModel.sendToast("Will play next")
+                showCloudSongSheet = false
+                selectedCloudSong = null
+            }
+        )
     }
 }
 
@@ -2894,7 +2935,8 @@ fun LibraryCloudTab(
 private fun CloudSongListItem(
     cloudSong: CloudSong,
     isPlaying: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onMoreOptionsClick: () -> Unit
 ) {
     Surface(
         onClick = onClick,
@@ -2904,7 +2946,7 @@ private fun CloudSongListItem(
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Cloud icon placeholder for album art
@@ -2947,6 +2989,130 @@ private fun CloudSongListItem(
             if (isPlaying) {
                 PlayingEqIcon(color = MaterialTheme.colorScheme.primary)
             }
+            
+            IconButton(onClick = onMoreOptionsClick) {
+                Icon(
+                    imageVector = Icons.Rounded.MoreVert,
+                    contentDescription = "More options",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Bottom sheet for cloud song options (play, add to queue, etc.)
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CloudSongInfoBottomSheet(
+    cloudSong: CloudSong,
+    onDismiss: () -> Unit,
+    onPlaySong: () -> Unit,
+    onAddToQueue: () -> Unit,
+    onAddNextToQueue: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentWindowInsets = { WindowInsets(0, 0, 0, 0) }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 32.dp)
+        ) {
+            // Song Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.primaryContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.telegram),
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.width(16.dp))
+                
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = cloudSong.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = cloudSong.artist,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${cloudSong.duration / 60}:${String.format("%02d", cloudSong.duration % 60)} • ${cloudSong.size / 1024 / 1024} MB",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+            }
+            
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            
+            // Play Now
+            ListItem(
+                headlineContent = { Text("Play Now") },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Rounded.PlayArrow,
+                        contentDescription = null
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onPlaySong)
+            )
+            
+            // Play Next
+            ListItem(
+                headlineContent = { Text("Play Next") },
+                leadingContent = {
+                    Icon(
+                        painter = painterResource(R.drawable.rounded_queue_music_24),
+                        contentDescription = null
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onAddNextToQueue)
+            )
+            
+            // Add to Queue
+            ListItem(
+                headlineContent = { Text("Add to Queue") },
+                leadingContent = {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null
+                    )
+                },
+                modifier = Modifier.clickable(onClick = onAddToQueue)
+            )
         }
     }
 }
