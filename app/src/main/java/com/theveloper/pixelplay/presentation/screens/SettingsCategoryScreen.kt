@@ -129,6 +129,7 @@ fun SettingsCategoryScreen(
     var showRebuildDatabaseWarning by remember { mutableStateOf(false) }
     var showRegenerateDailyMixDialog by remember { mutableStateOf(false) }
     var showRegenerateStatsDialog by remember { mutableStateOf(false) }
+    var showClearCloudCacheDialog by remember { mutableStateOf(false) }
 
     // Fetch models on page load when API key exists and models are not already loaded
     LaunchedEffect(category, geminiApiKey) {
@@ -603,6 +604,13 @@ fun SettingsCategoryScreen(
                                 trailingIcon = { Icon(Icons.Rounded.ChevronRight, "Open", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = { navController.navigate(Screen.TelegramLogin.route) }
                             )
+                            Spacer(Modifier.height(4.dp))
+                            SettingsItem(
+                                title = "Clear Cloud Cache",
+                                subtitle = "Remove all cached cloud song metadata and artwork.",
+                                leadingIcon = { Icon(Icons.Outlined.ClearAll, null, tint = MaterialTheme.colorScheme.secondary) },
+                                onClick = { showClearCloudCacheDialog = true }
+                            )
                         }
                         SettingsCategory.ABOUT -> {
                              SettingsItem(
@@ -754,6 +762,28 @@ fun SettingsCategoryScreen(
                 }
             },
             dismissButton = { TextButton(onClick = { showRegenerateStatsDialog = false }) { Text("Cancel") } }
+        )
+    }
+
+    if (showClearCloudCacheDialog) {
+        AlertDialog(
+            icon = { Icon(Icons.Outlined.Warning, null, tint = MaterialTheme.colorScheme.error) },
+            title = { Text("Clear Cloud Cache?") },
+            text = { Text("This will remove all cached metadata for cloud songs. Songs will need to have metadata re-extracted.") },
+            onDismissRequest = { showClearCloudCacheDialog = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearCloudCacheDialog = false
+                        settingsViewModel.clearCloudCache()
+                        Toast.makeText(context, "Cloud cache cleared", Toast.LENGTH_SHORT).show()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) {
+                    Text("Clear")
+                }
+            },
+            dismissButton = { TextButton(onClick = { showClearCloudCacheDialog = false }) { Text("Cancel") } }
         )
     }
 }

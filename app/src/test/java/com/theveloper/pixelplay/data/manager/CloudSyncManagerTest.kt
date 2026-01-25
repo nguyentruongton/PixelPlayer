@@ -30,12 +30,13 @@ class CloudSyncManagerTest {
     private lateinit var syncManager: CloudSyncManager
     private val mockRepository: TelegramRepository = mockk()
     private val mockCloudSongDao: CloudSongDao = mockk(relaxed = true)
+    private val mockMetadataExtractor: CloudMetadataExtractor = mockk(relaxed = true)
     private val testDispatcher = StandardTestDispatcher()
 
     @BeforeEach
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
-        syncManager = CloudSyncManager(mockRepository, mockCloudSongDao)
+        syncManager = CloudSyncManager(mockRepository, mockCloudSongDao, mockMetadataExtractor)
     }
 
     @AfterEach
@@ -166,6 +167,28 @@ class CloudSyncManagerTest {
             // Assert
             assertThat(result.isFailure).isTrue()
             assertThat(result.exceptionOrNull()?.message).contains("Network error")
+        }
+    }
+
+
+    @Nested
+    @DisplayName("clearCloudCache")
+    inner class ClearCloudCacheTests {
+        
+        @Test
+        fun `clearCloudCache clears dao and artwork cache`() = runTest(testDispatcher) {
+            // Arrange
+            coEvery { mockCloudSongDao.clearAll() } just Runs
+            coEvery { mockMetadataExtractor.clearArtworkCache() } just Runs
+            
+            // Act
+            syncManager.clearCloudCache()
+            
+            // Assert
+            coVerify(ordering = io.mockk.Ordering.ORDERED) {
+                mockCloudSongDao.clearAll()
+                mockMetadataExtractor.clearArtworkCache()
+            }
         }
     }
 }

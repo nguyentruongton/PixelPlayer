@@ -12,6 +12,7 @@ import android.provider.MediaStore
 import android.util.Log
 import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.database.MusicDao
+import com.theveloper.pixelplay.data.database.CloudSongDao
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -49,6 +50,11 @@ import com.theveloper.pixelplay.utils.LogUtils
 import com.theveloper.pixelplay.data.model.MusicFolder
 import com.theveloper.pixelplay.utils.LyricsUtils
 import com.theveloper.pixelplay.utils.DirectoryRuleResolver
+import com.theveloper.pixelplay.data.manager.CloudSyncManager
+import com.theveloper.pixelplay.data.model.CloudSong
+import com.theveloper.pixelplay.data.model.CloudAlbum
+import com.theveloper.pixelplay.data.model.CloudArtist
+import com.theveloper.pixelplay.data.model.ArtistRef
 import kotlinx.coroutines.flow.conflate
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -77,7 +83,9 @@ class MusicRepositoryImpl @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val searchHistoryDao: SearchHistoryDao,
     private val musicDao: MusicDao,
-    private val lyricsRepository: LyricsRepository
+    private val lyricsRepository: LyricsRepository,
+    private val cloudSyncManager: CloudSyncManager,
+    private val cloudSongDao: CloudSongDao
 ) : MusicRepository {
 
     private val directoryScanMutex = Mutex()
@@ -178,13 +186,67 @@ class MusicRepositoryImpl @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun getAudioFiles(): Flow<List<Song>> {
         LogUtils.d(this, "getAudioFiles")
-        return combine(
+        val localSongsFlow = combine(
             permittedSongsFlow,
             allArtistsFlow,
             allCrossRefsFlow
         ) { songs, artists, crossRefs ->
             mapSongList(songs, null, artists, crossRefs)
+        }
+
+        return combine(localSongsFlow, cloudSyncManager.savedSongs) { local, cloud ->
+            local + cloud.map { it.toSong() }
         }.flowOn(Dispatchers.IO)
+    }
+
+    private fun CloudSong.toSong(): Song {
+        return Song(
+            id = "cloud_${this.id}",
+            title = this.title,
+            artist = this.artist,
+            artistId = -(this.artist.hashCode().toLong()), // Negative ID for cloud artists
+            artists = listOf(ArtistRef(-(this.artist.hashCode().toLong()), this.artist, true)),
+            album = this.album ?: "",
+            albumId = -(this.album?.hashCode()?.toLong() ?: -1L), // Negative ID for cloud albums
+            albumArtist = this.artist,
+            path = this.fileId.toString(), // Store fileId as path for now, or null? storage path usually
+            contentUriString = "tdlib://${this.remoteFileId}",
+            albumArtUriString = this.artworkPath,
+            duration = this.duration * 1000L, // TdApi duration is seconds
+            genre = this.genre,
+            lyrics = null,
+            isFavorite = false,
+            trackNumber = this.trackNumber ?: 0,
+            year = this.year ?: 0,
+            dateAdded = this.dateAdded,
+            mimeType = "audio/mpeg", // Default assumption
+            bitrate = 0,
+            sampleRate = 0,
+            isCloud = true,
+            remoteId = this.remoteFileId
+        )
+    }
+
+    private fun CloudAlbum.toAlbum(): Album {
+        return Album(
+            id = -(this.name.hashCode().toLong()),
+            title = this.name,
+            artist = this.artist ?: "Unknown Artist",
+            year = 0, // CloudAlbum doesn't store year yet
+            albumArtUriString = this.artworkPath,
+            songCount = this.songCount,
+            isCloud = true
+        )
+    }
+
+    private fun CloudArtist.toArtist(): Artist {
+        return Artist(
+            id = -(this.name.hashCode().toLong()),
+            name = this.name,
+            songCount = this.songCount,
+            imageUrl = this.artworkPath,
+            isCloud = true
+        )
     }
     
     /**
@@ -248,7 +310,7 @@ class MusicRepositoryImpl @Inject constructor(
 
     override fun getAlbums(): Flow<List<Album>> {
         LogUtils.d(this, "getAlbums")
-        return combine(
+        val localAlbumsFlow = combine(
             musicDao.getAlbums(allowedParentDirs = emptyList(), applyDirectoryFilter = false),
             permittedSongsFlow,
             directoryFilterConfig
@@ -256,12 +318,22 @@ class MusicRepositoryImpl @Inject constructor(
             val allowedAlbumIds = allowedSongs.map { it.albumId }.toSet()
             albums.filter { allowedAlbumIds.contains(it.id) }
                 .map { it.toAlbum() }
+        }
+
+        return combine(localAlbumsFlow, cloudSyncManager.getAlbumsWithArtwork()) { local, cloud ->
+            local + cloud.map { it.toAlbum() }
         }.conflate().flowOn(Dispatchers.IO)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     override fun getAlbumById(id: Long): Flow<Album?> {
         LogUtils.d(this, "getAlbumById: $id")
+        if (id < 0) {
+            return cloudSyncManager.getAlbumsWithArtwork().map { albums ->
+                albums.map { it.toAlbum() }.find { it.id == id }
+            }.flowOn(Dispatchers.IO)
+        }
+
         return combine(
             musicDao.getAlbumById(id),
             permittedSongsFlow
@@ -269,13 +341,11 @@ class MusicRepositoryImpl @Inject constructor(
             val hasAccess = albumEntity != null && allowedSongs.any { it.albumId == id }
             if (hasAccess) albumEntity?.toAlbum() else null
         }.conflate().flowOn(Dispatchers.IO)
-        // Original simpler version (kept for reference, might be okay depending on requirements):
-        // return musicDao.getAlbumById(id).map { it?.toAlbum() }.flowOn(Dispatchers.IO)
     }
 
     override fun getArtists(): Flow<List<Artist>> {
         LogUtils.d(this, "getArtists")
-        return combine(
+        val localArtistsFlow = combine(
             musicDao.getArtists(allowedParentDirs = emptyList(), applyDirectoryFilter = false),
             permittedSongsFlow,
             directoryFilterConfig,
@@ -289,12 +359,27 @@ class MusicRepositoryImpl @Inject constructor(
 
             artists.filter { allowedArtistIds.contains(it.id) }
                 .map { it.toArtist() }
+        }
+
+        return combine(localArtistsFlow, cloudSyncManager.getArtistsWithArtwork()) { local, cloud ->
+            local + cloud.map { it.toArtist() }
         }.conflate().flowOn(Dispatchers.IO)
     }
 
     // getSongsForAlbum and getSongsForArtist should also respect directory permissions
     override fun getSongsForAlbum(albumId: Long): Flow<List<Song>> {
         LogUtils.d(this, "getSongsForAlbum: $albumId")
+        if (albumId < 0) {
+            return cloudSyncManager.getAlbumsWithArtwork().flatMapLatest { albums ->
+                val album = albums.map { it.toAlbum() }.find { it.id == albumId }
+                if (album != null) {
+                    cloudSongDao.getSongsByAlbum(album.title).map { songs -> songs.map { it.toSong() } }
+                } else {
+                    flowOf(emptyList())
+                }
+            }.flowOn(Dispatchers.IO)
+        }
+
         return combine(
             musicDao.getSongsByAlbumId(albumId),
             directoryFilterConfig,
@@ -307,6 +392,12 @@ class MusicRepositoryImpl @Inject constructor(
 
     override fun getArtistById(artistId: Long): Flow<Artist?> {
         LogUtils.d(this, "getArtistById: $artistId")
+        if (artistId < 0) {
+            return cloudSyncManager.getArtistsWithArtwork().map { artists ->
+                artists.map { it.toArtist() }.find { it.id == artistId }
+            }.flowOn(Dispatchers.IO)
+        }
+
         // Only return the artist if the user has access to at least one song by this artist
         return combine(
             musicDao.getArtistById(artistId),
@@ -331,6 +422,17 @@ class MusicRepositoryImpl @Inject constructor(
 
     override fun getSongsForArtist(artistId: Long): Flow<List<Song>> {
         LogUtils.d(this, "getSongsForArtist: $artistId")
+        if (artistId < 0) {
+            return cloudSyncManager.getArtistsWithArtwork().flatMapLatest { artists ->
+                val artist = artists.map { it.toArtist() }.find { it.id == artistId }
+                if (artist != null) {
+                    cloudSongDao.getSongsByArtist(artist.name).map { songs -> songs.map { it.toSong() } }
+                } else {
+                    flowOf(emptyList())
+                }
+            }.flowOn(Dispatchers.IO)
+        }
+
         return combine(
             musicDao.getSongsForArtist(artistId), // Use junction table query
             directoryFilterConfig,
@@ -373,7 +475,7 @@ class MusicRepositoryImpl @Inject constructor(
 
     override fun searchSongs(query: String): Flow<List<Song>> {
         if (query.isBlank()) return flowOf(emptyList())
-        return combine(
+        val localSearch = combine(
             musicDao.searchSongs(
                 query = query,
                 allowedParentDirs = emptyList(),
@@ -384,13 +486,22 @@ class MusicRepositoryImpl @Inject constructor(
             allCrossRefsFlow
         ) { songs, config, artists, crossRefs ->
             mapSongList(songs, config, artists, crossRefs)
+        }
+        
+        val cloudSearch = cloudSongDao.getAllCloudSongs().map { songs ->
+            songs.filter { it.title.contains(query, true) || it.artist.contains(query, true) }
+                 .map { it.toSong() }
+        }
+
+        return combine(localSearch, cloudSearch) { local, cloud ->
+            local + cloud
         }.conflate().flowOn(Dispatchers.IO)
     }
 
 
     override fun searchAlbums(query: String): Flow<List<Album>> {
         if (query.isBlank()) return flowOf(emptyList())
-        return combine(
+        val localSearch = combine(
             musicDao.searchAlbums(
                 query = query,
                 allowedParentDirs = emptyList(),
@@ -402,12 +513,21 @@ class MusicRepositoryImpl @Inject constructor(
             val allowedAlbumIds = allowedSongs.map { it.albumId }.toSet()
             albums.filter { allowedAlbumIds.contains(it.id) }
                 .map { it.toAlbum() }
+        }
+        
+        val cloudSearch = cloudSyncManager.getAlbumsWithArtwork().map { albums ->
+            albums.filter { it.name.contains(query, true) || (it.artist?.contains(query, true) == true) }
+                  .map { it.toAlbum() }
+        }
+
+        return combine(localSearch, cloudSearch) { local, cloud ->
+            local + cloud
         }.conflate().flowOn(Dispatchers.IO)
     }
 
     override fun searchArtists(query: String): Flow<List<Artist>> {
         if (query.isBlank()) return flowOf(emptyList())
-        return combine(
+        val localSearch = combine(
             musicDao.searchArtists(
                 query = query,
                 allowedParentDirs = emptyList(),
@@ -424,6 +544,15 @@ class MusicRepositoryImpl @Inject constructor(
 
             artists.filter { allowedArtistIds.contains(it.id) }
                 .map { it.toArtist() }
+        }
+        
+        val cloudSearch = cloudSyncManager.getArtistsWithArtwork().map { artists ->
+            artists.filter { it.name.contains(query, true) }
+                   .map { it.toArtist() }
+        }
+
+        return combine(localSearch, cloudSearch) { local, cloud ->
+            local + cloud
         }.conflate().flowOn(Dispatchers.IO)
     }
 
@@ -585,6 +714,16 @@ class MusicRepositoryImpl @Inject constructor(
     }
 
     override fun getSong(songId: String): Flow<Song?> {
+        // Check for Cloud ID
+        if (songId.startsWith("cloud_")) {
+            val cloudIdStr = songId.removePrefix("cloud_")
+            val cloudId = cloudIdStr.toLongOrNull()
+            if (cloudId != null) {
+                return cloudSongDao.getSongById(cloudId).map { it?.toSong() }
+            }
+            return flowOf(null)
+        }
+
         val songLongId = songId.toLongOrNull()
         if (songLongId == null) {
             Log.w("MusicRepo", "Invalid songId format for getSong: $songId")

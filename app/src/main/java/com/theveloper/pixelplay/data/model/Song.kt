@@ -32,6 +32,8 @@ data class Song(
     val mimeType: String?,
     val bitrate: Int?,
     val sampleRate: Int?,
+    val isCloud: Boolean = false,
+    val remoteId: String? = null
 ) {
     private val defaultArtistDelimiters = listOf("/", ";", ",", "+", "&")
 
@@ -82,7 +84,9 @@ data class Song(
                 dateAdded = 0,
                 mimeType = "-",
                 bitrate = 0,
-                sampleRate = 0
+                sampleRate = 0,
+                isCloud = false,
+                remoteId = null
             )
         }
     }

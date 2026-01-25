@@ -18,7 +18,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         SongEngagementEntity::class,
         com.theveloper.pixelplay.data.model.CloudSong::class // Added CloudSong entity
     ],
-    version = 13, // Incremented version for cloud_songs table
+    version = 14, // Incremented version for cloud_songs metadata fields
     exportSchema = false
 )
 abstract class PixelPlayDatabase : RoomDatabase() {
@@ -121,6 +121,19 @@ abstract class PixelPlayDatabase : RoomDatabase() {
                         dateAdded INTEGER NOT NULL
                     )
                 """.trimIndent())
+            }
+        }
+        
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Add metadata fields to cloud_songs table
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN album TEXT NOT NULL DEFAULT 'Unknown Album'")
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN albumArtist TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN genre TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN year INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN trackNumber INTEGER DEFAULT NULL")
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN artworkPath TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE cloud_songs ADD COLUMN metadataExtracted INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

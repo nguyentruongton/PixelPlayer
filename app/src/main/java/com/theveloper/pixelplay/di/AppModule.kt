@@ -17,6 +17,8 @@ import com.theveloper.pixelplay.data.database.MusicDao
 import com.theveloper.pixelplay.data.database.PixelPlayDatabase
 import com.theveloper.pixelplay.data.database.SearchHistoryDao
 import com.theveloper.pixelplay.data.database.TransitionDao
+import com.theveloper.pixelplay.data.database.CloudSongDao
+import com.theveloper.pixelplay.data.manager.CloudSyncManager
 import com.theveloper.pixelplay.data.preferences.UserPreferencesRepository
 import com.theveloper.pixelplay.data.preferences.dataStore
 import com.theveloper.pixelplay.data.media.SongMetadataEditor
@@ -86,7 +88,8 @@ object AppModule {
             PixelPlayDatabase.MIGRATION_9_10,
             PixelPlayDatabase.MIGRATION_10_11,
             PixelPlayDatabase.MIGRATION_11_12,
-            PixelPlayDatabase.MIGRATION_12_13
+            PixelPlayDatabase.MIGRATION_12_13,
+            PixelPlayDatabase.MIGRATION_13_14
         )
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
@@ -172,14 +175,18 @@ object AppModule {
         userPreferencesRepository: UserPreferencesRepository,
         searchHistoryDao: SearchHistoryDao,
         musicDao: MusicDao, // Añadir MusicDao como parámetro
-        lyricsRepository: LyricsRepository
+        lyricsRepository: LyricsRepository,
+        cloudSyncManager: CloudSyncManager,
+        cloudSongDao: CloudSongDao
     ): MusicRepository {
         return MusicRepositoryImpl(
             context = context,
             userPreferencesRepository = userPreferencesRepository,
             searchHistoryDao = searchHistoryDao,
             musicDao = musicDao,
-            lyricsRepository = lyricsRepository
+            lyricsRepository = lyricsRepository,
+            cloudSyncManager = cloudSyncManager,
+            cloudSongDao = cloudSongDao
         )
     }
 
